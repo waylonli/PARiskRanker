@@ -4,27 +4,16 @@ import numpy as np
 
 from ranking_model.rankformer import RankFormer
 from ranking_model.loss import MSELoss, SoftmaxLoss, LambdaLoss
-import wandb
 import argparse
 import os
 import pandas as pd
-import wandb
 import json
 import torch
 from preprocess.dataloader import load_data
 from tqdm import tqdm
 from sklearn.metrics import ndcg_score
 
-wandb.login(key="7df6d9f317ae32fb59951e8a490b1b25acd57f92")
-
 def train_rankformer(args):
-    current_time = datetime.now().strftime('%b%d_%H:%M:%S')
-    # init wandb
-    wandb.init(project="Risky-Trader-Prediction",
-               entity="uoe-turing",
-               name="Train-RankFormer-{}-{}".format(args.strategy, current_time),
-               tags=['ranking', 'train', str(args.group_size), args.strategy],
-               config=vars(args))
     args.head_hidden_layers = [int(layer) for layer in
                                args.head_hidden_layers.replace('[', '').replace(']', '').split(',')]
     # define variables
@@ -112,7 +101,6 @@ def train_rankformer(args):
             loss.backward()
             optimizer.step()
 
-        wandb.log({'train_loss': log_loss / len(train_loader), 'learning_rate': scheduler.get_last_lr()[0]})
         loop.set_description(f"Epoch {epoch} | Train Loss {round(log_loss / len(train_loader), 4)}")
         # evaluate on dev set every 10 epochs and save the best model
         if epoch % 10 == 0:
@@ -124,7 +112,7 @@ def train_rankformer(args):
                 loss = criterion(y_pred, target) / args.group_size if args.strategy == 'ordinal' else criterion(y_pred, target)
                 dev_loss += loss.item()
             dev_loss /= len(dev_loader)
-            wandb.log({'dev_loss': dev_loss})
+
             loop.set_description(f"Epoch {epoch} | Train Loss {round(log_loss / len(train_loader), 4)} | Dev Loss {round(dev_loss, 4)}")
             if dev_loss < best_dev_loss:
                 since_last_improvement = 0
@@ -143,11 +131,6 @@ def train_rankformer(args):
     return
 
 def test_rankformer(args):
-    # init wandb
-    wandb.init(project="Risky-Trader-Prediction",
-               entity="uoe-turing",
-               name="Test-RankFormer-{}-{}-{}".format(args.model_group_size, args.test_group_size, args.strategy),
-               tags=['ranking', 'test', str(f"{args.model_group_size}-{args.test_group_size}"), args.strategy])
 
     variables = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16",
                  "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24", "V25", "V26", "V27", "V28"]
@@ -260,8 +243,6 @@ def test_rankformer(args):
     test_ndcg_5 /= len(test_set['qid'].unique())
     test_ndcg_10 /= len(test_set['qid'].unique())
 
-    wandb.log({'train_NDCG@3': train_ndcg_3, 'train_NDCG@5': train_ndcg_5, 'train_NDCG@10': train_ndcg_10,
-               'test_NDCG@3': test_ndcg_3, 'test_NDCG@5': test_ndcg_5, 'test_NDCG@10': test_ndcg_10})
     print("Train NDCG@3: {:.4f}".format(train_ndcg_3))
     print("Train NDCG@5: {:.4f}".format(train_ndcg_5))
     print("Train NDCG@10: {:.4f}".format(train_ndcg_10))
