@@ -176,6 +176,7 @@ class CrossEntropyLoss(BaseRankLoss):
         loss = losses.mean()
         return loss
 
+
 class GraphBasedLoss(torch.nn.Module):
     def __init__(self, margin=1.0, epsilon=1e-8, top_k=3, train_mode=True):
         super(GraphBasedLoss, self).__init__()
