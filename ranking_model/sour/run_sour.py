@@ -5,23 +5,12 @@ import argparse
 import lightgbm as lgb
 import numpy as np
 import pandas as pd
-# import wandb
 from matplotlib import pyplot as plt
 from sklearn.metrics import ndcg_score
 from tqdm import tqdm
 
-# wandb offline
-# wandb.offline = True
 
 def run_sour(args):
-
-    current_time = datetime.now().strftime('%b%d_%H:%M:%S')
-    # init wandb
-    # wandb.init(project="Risky-Trader-Prediction",
-    #            entity="uoe-turing",
-    #            name="Run-SOUR-{}-{}".format(args.strategy, current_time),
-    #            tags=['ranking', 'train', 'test', str(args.group_size), args.strategy],
-    #            config=vars(args))
 
     # define variables
     variables = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16",
@@ -132,8 +121,6 @@ def run_sour(args):
     test_ndcg_10 /= validate_test_qids
     test_mrr /= validate_test_qids
 
-    # wandb.log(
-    #     {'test_NDCG@3': test_ndcg_3, 'test_NDCG@5': test_ndcg_5, 'test_NDCG@10': test_ndcg_10, 'test_MRR': test_mrr})
     print("Train NDCG@3: {:.4f}".format(train_ndcg_3))
     print("Train NDCG@5: {:.4f}".format(train_ndcg_5))
     print("Train NDCG@10: {:.4f}".format(train_ndcg_10))
