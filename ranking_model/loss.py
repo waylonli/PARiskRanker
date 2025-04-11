@@ -220,13 +220,7 @@ class GraphBasedLoss(torch.nn.Module):
         pnl_diffs = pnl_diffs * score_diffs_mask
         normalised_pnl_diffs = self.log_normalize(pnl_diffs)
         loss = torch.nn.functional.binary_cross_entropy_with_logits(score_diffs*score_diffs_mask, score_diffs_mask, reduction='sum', weight=normalised_pnl_diffs)
-        # if pnl.max() > 460000 and pnl.max() < 470000:
-        #     print("=====================================")
-        #     printed_pnl_values, printed_pnl_indices = pnl.topk(20, largest=True)
-        #     # print(normalised_pnl_diffs)
-        #     # print(weights_for_each_row)
-        #     printed_scores = scores[printed_pnl_indices]
-        #     print("scores: ", printed_scores)
+
         return loss / len(sorted_scores)
 
 
@@ -418,13 +412,3 @@ class LambdaLoss(BaseRankLoss):
 
     def rankNetWeightedByGTDiffPowed_scheme(self, G, D, *args):
         return torch.abs(torch.pow(args[1][:, :, None], 2) - torch.pow(args[1][:, None, :], 2))
-
-
-
-
-if __name__ == '__main__':
-    scores = torch.tensor([-1, -1, -1, -1, -1])
-    target = torch.tensor([0, 0, 1, 0, 1])
-    pnl = torch.tensor([0, 1, 55, 2, 45])
-    loss = GraphBasedLoss()
-    print(loss.forward(scores, target, pnl))
