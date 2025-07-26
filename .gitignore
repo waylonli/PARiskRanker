@@ -164,3 +164,4 @@ storage/
 wandb/
 .DS_Store
 .idea/
+*.zip
