@@ -21,7 +21,9 @@ class PARiskRanker(torch.nn.Module):
             output_embedding_mode=False,
             loss_fn="graph",
             ft_embedder_checkpoint_path=None,
-            ft_embedder_train_data=None
+            ft_embedder_train_data=None,
+            freeze_ft_embedder=True,
+            dataset_name=None,
         ):
 
         super().__init__()
@@ -39,6 +41,7 @@ class PARiskRanker(torch.nn.Module):
         self.input_dim = input_dim
         self.transformer = None
         self.rank_score_net = None
+        self.dataset_name = dataset_name
 
         encoder_layer = torch.nn.TransformerEncoderLayer(self.input_dim, nhead=tf_nhead,
                                                          dim_feedforward=tf_dim_feedforward, dropout=dropout,
@@ -49,11 +52,19 @@ class PARiskRanker(torch.nn.Module):
 
         self.rank_score_net = MLP(input_dim=self.input_dim, hidden_layers=head_hidden_layers, output_dim=1,
                                   dropout=dropout)
-        self.ft_embedder = torch.load(ft_embedder_checkpoint_path) if ft_embedder_checkpoint_path else self.train_ft_embedder(ft_embedder_train_data)
+
+        if ft_embedder_checkpoint_path and os.path.exists(ft_embedder_checkpoint_path):
+            self.ft_embedder = torch.load(ft_embedder_checkpoint_path)
+        else:
+            self.ft_embedder = self.train_ft_embedder(ft_embedder_train_data)
 
         # freeze the ft_embedder
-        for param in self.ft_embedder.parameters():
-            param.requires_grad = True
+        if freeze_ft_embedder:
+            for param in self.ft_embedder.parameters():
+                param.requires_grad = False
+        else:
+            for param in self.ft_embedder.parameters():
+                param.requires_grad = True
 
         if loss_fn == "softmax":
             self.rank_loss_fn = SoftmaxLoss()
@@ -134,7 +145,7 @@ class PARiskRanker(torch.nn.Module):
 
         optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
         criterion = torch.nn.BCEWithLogitsLoss()
-        for epoch in tqdm(range(50), bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}'):
+        for epoch in tqdm(range(100), bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}'):
             val_loss_sum = 0
             model.train()
             for batch in train_loader:
@@ -159,15 +170,15 @@ class PARiskRanker(torch.nn.Module):
                     print('epoch: {}, val loss: {:.4f}'.format(epoch, val_loss_sum))
                     if val_loss_sum < optimal_val_loss:
                         optimal_val_loss = val_loss_sum
-                        stored_path = './storage/ft_embedding_model'
+                        stored_path = './storage/ft_embedding_model' if self.dataset_name is None else f'./storage/{self.dataset_name}/ft_embedding_model'
                         if not os.path.exists(stored_path):
                             os.makedirs(stored_path)
-                        torch.save(model, './storage/ft_embedding_model/ft_embedder.pt')
+                        torch.save(model, f'{stored_path}/ft_embedder.pt')
             else:
-                stored_path = './storage/ft_embedding_model'
+                stored_path = './storage/ft_embedding_model' if self.dataset_name is None else f'./storage/{self.dataset_name}/ft_embedding_model'
                 if not os.path.exists(stored_path):
                     os.makedirs(stored_path)
-                torch.save(model, './storage/ft_embedding_model/ft_embedder.pt')
+                torch.save(model, f'{stored_path}/ft_embedder.pt')
 
         return model
 

@@ -8,6 +8,8 @@ from sklearn.metrics import ndcg_score
 from tqdm import tqdm
 from scipy.special import expit  # Sigmoid function
 
+import util
+
 # Global variable to store group information for training
 GLOBAL_GROUPS = None
 
@@ -22,7 +24,7 @@ def setup_globals(train_set, group_column, profit_column):
 
 def pa_bce_objective(y_true, y_pred, weight):
     global GLOBAL_GROUPS, GLOBAL_PROFITS
-    top_k = 50  # Predefined value inside the function
+    top_k = 20  # Predefined value inside the function
 
     grad = np.zeros_like(y_pred)
     hess = np.zeros_like(y_pred)
@@ -51,6 +53,8 @@ def pa_bce_objective(y_true, y_pred, weight):
 
         pred_prob = expit(pred_diff)
 
+        # see when to use log, only when the magnitude of profit_diff is large
+
         pnl_gap = np.log1p(np.abs(profit_diff))
         S_ij = (profit_diff > 0).astype(float)
 
@@ -68,15 +72,30 @@ def pa_bce_objective(y_true, y_pred, weight):
 def run_lambdamart(args):
     global GLOBAL_GROUPS  # use global variable to store group info
 
-    variables = ['V1', 'V2', 'V3', 'V4', 'V5', 'V6', 'V7', 'V8', 'V9', 'V10', 'V11', 'V12', 'V13', 'V14', 'V15', 'V16',
-                 'V17', 'V18',
-                 'V19', 'V20', 'V21', 'V22', 'V23', 'V24', 'V25', 'V26', 'V27', 'V28']
+    if args.dataset == 'creditcard':
+        variables = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15",
+                     "V16",
+                     "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24", "V25", "V26", "V27", "V28"]
+
+    elif args.dataset == 'jobprofit':
+        # bedrooms,bathrooms,sqft_living,floors,waterfront,view,condition
+        variables_num = ['Jobs_Gross_Margin_Percentage', 'Labor_Pay', 'Labor_Burden', 'Material_Costs', 'PO_Costs',
+                         'Equipment_Costs', 'Materials__Equip__POs_As_percent_of_Sales',
+                         'Labor_Burden_as_percent_of_Sales', 'Labor_Pay_as_percent_of_Sales', 'Sold_Hours',
+                         'Total_Hours_Worked', 'Total_Technician_Paid_Time', 'NonBillable_Hours', 'Jobs_Total_Costs',
+                         'Jobs_Estimate_Sales_Subtotal', 'Jobs_Estimate_Sales_Installed',
+                         'Materials__Equipment__PO_Costs']
+        variables_cat = ['Is_Lead', 'Opportunity', 'Warranty', 'Recall', 'Converted', 'Estimates']
+        variables = variables_num + variables_cat
+
+    else:
+        raise Exception('Dataset not implemented')
 
     # Load data and sort by query id.
     label_column = 'Class'
-    train_set = pd.read_csv(os.path.join('data', 'creditcard', f'fold{str(args.fold)}', '100', 'train.csv'))
+    train_set = pd.read_csv(os.path.join('data', args.dataset, f'fold{str(args.fold)}', '100', 'train.csv'))
     train_set = train_set.sort_values(by=['qid'], ascending=[True])
-    val_set = pd.read_csv(os.path.join('data', 'creditcard', f'fold{str(args.fold)}', '100', 'val.csv'))
+    val_set = pd.read_csv(os.path.join('data', args.dataset, f'fold{str(args.fold)}', '100', 'val.csv'))
     val_set = val_set.sort_values(by=['qid'], ascending=[True])
 
     X_train = train_set[variables + ['qid']]
@@ -116,7 +135,7 @@ def run_lambdamart(args):
     val_set['fst_step_scores'] = ranker.predict(X_val)
     val_set['ranking_label'] = val_set.groupby('qid')['fst_step_scores'].rank(method='first', ascending=False)
 
-    test_set = pd.read_csv(os.path.join('data', 'creditcard', f'fold{str(args.fold)}', '100', 'test.csv'))
+    test_set = pd.read_csv(os.path.join('data', args.dataset, f'fold{str(args.fold)}', '100', 'test.csv'))
     test_set = test_set.sort_values(by=['qid'], ascending=[True])
     X_test = test_set[variables + ['qid']]
     ranking_score = ranker.predict(X_test)
@@ -124,49 +143,15 @@ def run_lambdamart(args):
     test_set['ranking_label'] = test_set.groupby('qid')['fst_step_scores'].rank(method='first', ascending=False)
 
     # Save results.
-    model_path = os.path.join('storage', f'lambdamart_benchmark_{args.n_estimators}_fold{args.fold}') if args.objective == 'lambdarank' else os.path.join('storage', f'lambdamart_pabce_{args.n_estimators}_fold{args.fold}')
+    model_path = os.path.join('storage', args.dataset, f'lambdamart_benchmark_{args.n_estimators}_fold{args.fold}') if args.objective == 'lambdarank' else os.path.join('storage', args.dataset, f'lambdamart_pabce_{args.n_estimators}_fold{args.fold}')
     os.makedirs(model_path, exist_ok=True)
     train_set.sample(frac=1).reset_index(drop=True).to_csv(os.path.join(model_path, 'train.csv'), index=False)
     val_set.sample(frac=1).reset_index(drop=True).to_csv(os.path.join(model_path, 'val.csv'), index=False)
     test_set.sample(frac=1).reset_index(drop=True).to_csv(os.path.join(model_path, 'test.csv'), index=False)
 
-    # Compute evaluation metrics.
-    train_ndcg_3 = train_ndcg_5 = train_ndcg_10 = train_mrr = 0
-    validate_train_qids = 0
-    test_ndcg_3 = test_ndcg_5 = test_ndcg_10 = test_mrr = 0
-    validate_test_qids = 0
+    train_ndcg_3, train_ndcg_5, train_ndcg_10, train_mrr = util.compute_ranking_metrics(train_set)
 
-    for qid in tqdm(train_set['qid'].unique(), desc="Computing NDCG for training set"):
-        target_label = train_set[train_set['qid'] == qid]['Class'].values.astype(int)
-        if max(target_label) == 0:
-            continue
-        validate_train_qids += 1
-        rank_score = train_set[train_set['qid'] == qid]['fst_step_scores'].values
-        if max(rank_score) > 1 or min(rank_score) < 0:
-            rank_score = 1 / (1 + np.exp(-rank_score))
-        train_ndcg_3 += ndcg_score([target_label], [rank_score], k=3)
-        train_ndcg_5 += ndcg_score([target_label], [rank_score], k=5)
-        train_ndcg_10 += ndcg_score([target_label], [rank_score], k=10)
-        train_mrr += 1 / (np.where(rank_score == max(rank_score))[0][0] + 1)
-    train_ndcg_3 /= validate_train_qids
-    train_ndcg_5 /= validate_train_qids
-    train_ndcg_10 /= validate_train_qids
-    train_mrr /= validate_train_qids
-
-    for qid in tqdm(test_set['qid'].unique(), desc="Computing NDCG for testing set"):
-        target_label = test_set[test_set['qid'] == qid]['Class'].values.astype(int)
-        if max(target_label) == 0:
-            continue
-        validate_test_qids += 1
-        rank_score = test_set[test_set['qid'] == qid]['fst_step_scores'].values
-        test_ndcg_3 += ndcg_score([target_label], [rank_score], k=3)
-        test_ndcg_5 += ndcg_score([target_label], [rank_score], k=5)
-        test_ndcg_10 += ndcg_score([target_label], [rank_score], k=10)
-        test_mrr += 1 / (np.where(rank_score == max(rank_score))[0][0] + 1)
-    test_ndcg_3 /= validate_test_qids
-    test_ndcg_5 /= validate_test_qids
-    test_ndcg_10 /= validate_test_qids
-    test_mrr /= validate_test_qids
+    test_ndcg_3, test_ndcg_5, test_ndcg_10, test_mrr = util.compute_ranking_metrics(test_set)
 
     print("Train NDCG@3: {:.4f}".format(train_ndcg_3))
     print("Train NDCG@5: {:.4f}".format(train_ndcg_5))
@@ -187,7 +172,8 @@ if __name__ == '__main__':
                         required=True)
     parser.add_argument("--objective", type=str, choices=['lambdarank', 'pabce'],
                         required=True)
-    parser.add_argument("--n_estimators", type=int, required=True)
+    parser.add_argument("--n_estimators", type=int, default=10000)
+    parser.add_argument("--dataset", type=str, required=True)
     parser.add_argument("--fold", type=int, default=1)
     args = parser.parse_args()
     run_lambdamart(args)

@@ -2,6 +2,7 @@ from datetime import datetime
 
 import numpy as np
 
+import util
 from ranking_model.rankformer import RankFormer
 from ranking_model.loss import MSELoss, SoftmaxLoss, LambdaLoss
 import argparse
@@ -17,8 +18,23 @@ def train_rankformer(args):
     args.head_hidden_layers = [int(layer) for layer in
                                args.head_hidden_layers.replace('[', '').replace(']', '').split(',')]
     # define variables
-    variables = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16",
-                 "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24", "V25", "V26", "V27", "V28"]
+    if args.dataset == 'creditcard':
+        variables = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16",
+                     "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24", "V25", "V26", "V27", "V28"]
+
+
+    elif args.dataset == "jobprofit":
+        conti_variables = ['Jobs_Gross_Margin_Percentage', 'Labor_Pay', 'Labor_Burden', 'Material_Costs', 'PO_Costs',
+                           'Equipment_Costs', 'Materials__Equip__POs_As_percent_of_Sales',
+                           'Labor_Burden_as_percent_of_Sales', 'Labor_Pay_as_percent_of_Sales', 'Sold_Hours',
+                           'Total_Hours_Worked', 'Total_Technician_Paid_Time', 'NonBillable_Hours', 'Jobs_Total_Costs',
+                           'Jobs_Estimate_Sales_Subtotal', 'Jobs_Estimate_Sales_Installed',
+                           'Materials__Equipment__PO_Costs']
+        categ_variables = ['Is_Lead', 'Opportunity', 'Warranty', 'Recall', 'Converted', 'Estimates']
+        variables = conti_variables + categ_variables
+
+    else:
+        raise ValueError("Dataset not supported")
 
     batch_size_map = {20: 512, 50: 512, 100: 256, 200: 256, 500: 128, 1000: 32}
     args.batch_size = batch_size_map[args.group_size]
@@ -47,12 +63,12 @@ def train_rankformer(args):
     rankformer.to(device)
 
     # save the config
-    if not os.path.exists("./storage/rankformer_{}_{}_{}_fold{}".format(args.group_size, args.strategy, args.loss, str(args.fold))):
-        os.makedirs("./storage/rankformer_{}_{}_{}_fold{}".format(args.group_size, args.strategy, args.loss, str(args.fold)))
+    if not os.path.exists("./storage/{}/rankformer_{}_{}_{}_fold{}".format(args.dataset, args.group_size, args.strategy, args.loss, str(args.fold))):
+        os.makedirs("./storage/{}/rankformer_{}_{}_{}_fold{}".format(args.dataset, args.group_size, args.strategy, args.loss, str(args.fold)))
     config_dict = rankformer.export_config_dict()
     config_dict['group_size'] = args.group_size
     config_dict['strategy'] = args.strategy
-    with open(os.path.join("./storage/rankformer_{}_{}_{}_fold{}".format(args.group_size, args.strategy, args.loss, str(args.fold)), 'config.json'), 'w') as f:
+    with open(os.path.join("./storage/{}/rankformer_{}_{}_{}_fold{}".format(args.dataset, args.group_size, args.strategy, args.loss, str(args.fold)), 'config.json'), 'w') as f:
         json.dump(config_dict, f)
 
     # if torch.cuda.device_count() > 1:
@@ -103,7 +119,7 @@ def train_rankformer(args):
 
         loop.set_description(f"Epoch {epoch} | Train Loss {round(log_loss / len(train_loader), 4)}")
         # evaluate on dev set every 10 epochs and save the best model
-        if epoch % 10 == 0:
+        if epoch % 5 == 0:
             rankformer.eval()
             dev_loss = 0
             for batch in dev_loader:
@@ -118,9 +134,9 @@ def train_rankformer(args):
                 since_last_improvement = 0
                 print(f"Saving best model at epoch {epoch}")
                 best_dev_loss = dev_loss
-                if os.path.exists(os.path.join("./storage/rankformer_{}_{}_{}_fold{}".format(args.group_size, args.strategy, args.loss, str(args.fold)), 'best_model.pt')):
-                    os.remove(os.path.join("./storage/rankformer_{}_{}_{}_fold{}".format(args.group_size, args.strategy, args.loss, str(args.fold)), 'best_model.pt'))
-                torch.save(rankformer.state_dict(), os.path.join("./storage/rankformer_{}_{}_{}_fold{}".format(args.group_size, args.strategy, args.loss, str(args.fold)), 'best_model.pt'))
+                if os.path.exists(os.path.join("./storage/{}/rankformer_{}_{}_{}_fold{}".format(args.dataset, args.group_size, args.strategy, args.loss, str(args.fold)), 'best_model.pt')):
+                    os.remove(os.path.join("./storage/{}/rankformer_{}_{}_{}_fold{}".format(args.dataset, args.group_size, args.strategy, args.loss, str(args.fold)), 'best_model.pt'))
+                torch.save(rankformer.state_dict(), os.path.join("./storage/{}/rankformer_{}_{}_{}_fold{}".format(args.dataset, args.group_size, args.strategy, args.loss, str(args.fold)), 'best_model.pt'))
                 # save the config file
         # early stopping if the dev loss does not decrease for 50 epochs
         if since_last_improvement >= 60:
@@ -131,12 +147,23 @@ def train_rankformer(args):
     return
 
 def test_rankformer(args):
-
-    variables = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16",
-                 "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24", "V25", "V26", "V27", "V28"]
+    if args.dataset == 'creditcard':
+        variables = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16",
+                     "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24", "V25", "V26", "V27", "V28"]
+    elif args.dataset == "jobprofit":
+        conti_variables = ['Jobs_Gross_Margin_Percentage', 'Labor_Pay', 'Labor_Burden', 'Material_Costs', 'PO_Costs',
+                           'Equipment_Costs', 'Materials__Equip__POs_As_percent_of_Sales',
+                           'Labor_Burden_as_percent_of_Sales', 'Labor_Pay_as_percent_of_Sales', 'Sold_Hours',
+                           'Total_Hours_Worked', 'Total_Technician_Paid_Time', 'NonBillable_Hours', 'Jobs_Total_Costs',
+                           'Jobs_Estimate_Sales_Subtotal', 'Jobs_Estimate_Sales_Installed',
+                           'Materials__Equipment__PO_Costs']
+        categ_variables = ['Is_Lead', 'Opportunity', 'Warranty', 'Recall', 'Converted', 'Estimates']
+        variables = conti_variables + categ_variables
+    else:
+        raise ValueError("Dataset not supported")
 
     # load the best model and config
-    model_path = os.path.join('storage', 'rankformer_{}_{}_{}_fold{}'.format(args.model_group_size, args.strategy, args.loss, str(args.fold)))
+    model_path = os.path.join('storage', args.dataset, 'rankformer_{}_{}_{}_fold{}'.format(args.model_group_size, args.strategy, args.loss, str(args.fold)))
     output_path = os.path.join(model_path, args.test_group_size)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     with open(os.path.join(model_path, 'config.json'), 'r') as f:
@@ -212,36 +239,9 @@ def test_rankformer(args):
     # use proper evaluation metric ndcg@k depending on the group size
     print("Computing NDCG score...")
 
-    train_ndcg_3 = 0
-    train_ndcg_5 = 0
-    train_ndcg_10 = 0
-    test_ndcg_3 = 0
-    test_ndcg_5 = 0
-    test_ndcg_10 = 0
+    train_ndcg_3, train_ndcg_5, train_ndcg_10, train_mrr = util.compute_ranking_metrics(train_set)
 
-    for qid in tqdm(train_set['qid'].unique(), bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}', desc="Computing NDCG score for training set"):
-        rank_score = train_set[train_set['qid'] == qid]['fst_step_scores'].values
-        if max(rank_score) > 1 or min(rank_score) < 0:
-            rank_score = 1 / (1 + np.exp(-rank_score))
-        target_label = train_set[train_set['qid'] == qid]['Class'].values.astype(int)
-        train_ndcg_3 += ndcg_score([target_label], [rank_score], k=3)
-        train_ndcg_5 += ndcg_score([target_label], [rank_score], k=5)
-        train_ndcg_10 += ndcg_score([target_label], [rank_score], k=10)
-    train_ndcg_3 /= len(train_set['qid'].unique())
-    train_ndcg_5 /= len(train_set['qid'].unique())
-    train_ndcg_10 /= len(train_set['qid'].unique())
-
-    for qid in tqdm(test_set['qid'].unique(), bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}', desc="Computing NDCG score for testing set"):
-        rank_score = test_set[test_set['qid'] == qid]['fst_step_scores'].values
-        if max(rank_score) > 1 or min(rank_score) < 0:
-            rank_score = 1 / (1 + np.exp(-rank_score))
-        target_label = test_set[test_set['qid'] == qid]['Class'].values.astype(int)
-        test_ndcg_3 += ndcg_score([target_label], [rank_score], k=3)
-        test_ndcg_5 += ndcg_score([target_label], [rank_score], k=5)
-        test_ndcg_10 += ndcg_score([target_label], [rank_score], k=10)
-    test_ndcg_3 /= len(test_set['qid'].unique())
-    test_ndcg_5 /= len(test_set['qid'].unique())
-    test_ndcg_10 /= len(test_set['qid'].unique())
+    test_ndcg_3, test_ndcg_5, test_ndcg_10, test_mrr = util.compute_ranking_metrics(test_set)
 
     print("Train NDCG@3: {:.4f}".format(train_ndcg_3))
     print("Train NDCG@5: {:.4f}".format(train_ndcg_5))
@@ -256,11 +256,11 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     subparsers = parser.add_subparsers(dest='mode')
     train_parser = subparsers.add_parser('train')
-    train_parser.add_argument("--epochs", type=int, default=50)
+    train_parser.add_argument("--epochs", type=int, default=100)
     train_parser.add_argument("--batch_size", type=int, default=32)
-    train_parser.add_argument("--lr", type=float, default=1e-4)
-    train_parser.add_argument("--dataset", type=str, default="creditcard")
-    train_parser.add_argument("--weight_decay", type=float, default=1e-5)
+    train_parser.add_argument("--lr", type=float, default=1e-3)
+    train_parser.add_argument("--dataset", type=str, required=True)
+    train_parser.add_argument("--weight_decay", type=float, default=1e-4)
     train_parser.add_argument("--optimizer", type=str, default="adam")
     train_parser.add_argument("--group_size", type=int, choices=[20, 50, 100, 200, 500, 1000], default=100)
     train_parser.add_argument("--tf_dim_feedforward", type=int, default=128)

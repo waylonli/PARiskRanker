@@ -178,7 +178,7 @@ class CrossEntropyLoss(BaseRankLoss):
 
 
 class GraphBasedLoss(torch.nn.Module):
-    def __init__(self, margin=1.0, epsilon=1e-8, top_k=3, train_mode=True):
+    def __init__(self, margin=1.0, epsilon=1e-8, top_k=6, train_mode=True):
         super(GraphBasedLoss, self).__init__()
         self.margin = margin
         self.epsilon = epsilon

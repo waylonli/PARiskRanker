@@ -144,9 +144,8 @@ class FTTransformer(nn.Module):
             categories_offset = F.pad(torch.tensor(list(categories)), (1, 0), value=num_special_tokens)
             categories_offset = categories_offset.cumsum(dim = -1)[:-1]
             self.register_buffer('categories_offset', categories_offset)
-
             # categorical embedding
-            self.categorical_embeds = nn.Embedding(total_tokens+1, dim)
+            self.categorical_embeds = nn.Embedding(int(total_tokens)+1, dim)
 
         # continuous
 
@@ -184,6 +183,8 @@ class FTTransformer(nn.Module):
         xs = []
         if self.num_unique_categories > 0:
             x_categ = x_categ + self.categories_offset
+            # make sure it's a long tensor, as the embedding layer expects long tensors
+            x_categ = x_categ.long()
             x_categ = self.categorical_embeds(x_categ)
 
             xs.append(x_categ)

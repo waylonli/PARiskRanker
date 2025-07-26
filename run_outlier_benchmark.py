@@ -7,12 +7,28 @@ import torch
 from evaluation.metrics import evaluate
 from deepod.metrics import tabular_metrics
 
-def train_and_test_outlier(model):
-    variables = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16",
-                 "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24", "V25", "V26", "V27", "V28"]
-    train_set = pd.read_csv(f'data/creditcard/fold{str(args.fold)}/100/train.csv')
-    val_set = pd.read_csv(f'data/creditcard/fold{str(args.fold)}/100/val.csv')
-    test_set = pd.read_csv(f'data/creditcard/fold{str(args.fold)}/100/test.csv')
+def train_and_test_outlier(model, dataset):
+    if dataset == "creditcard":
+        variables = ["V1", "V2", "V3", "V4", "V5", "V6", "V7", "V8", "V9", "V10", "V11", "V12", "V13", "V14", "V15", "V16",
+                     "V17", "V18", "V19", "V20", "V21", "V22", "V23", "V24", "V25", "V26", "V27", "V28"]
+        train_set = pd.read_csv(f'data/creditcard/fold{str(args.fold)}/100/train.csv')
+        val_set = pd.read_csv(f'data/creditcard/fold{str(args.fold)}/100/val.csv')
+        test_set = pd.read_csv(f'data/creditcard/fold{str(args.fold)}/100/test.csv')
+    elif dataset == "jobprofit":
+        variables_num = ['Jobs_Gross_Margin_Percentage', 'Labor_Pay', 'Labor_Burden', 'Material_Costs', 'PO_Costs',
+                         'Equipment_Costs', 'Materials__Equip__POs_As_percent_of_Sales',
+                         'Labor_Burden_as_percent_of_Sales', 'Labor_Pay_as_percent_of_Sales', 'Sold_Hours',
+                         'Total_Hours_Worked', 'Total_Technician_Paid_Time', 'NonBillable_Hours', 'Jobs_Total_Costs',
+                         'Jobs_Estimate_Sales_Subtotal', 'Jobs_Estimate_Sales_Installed',
+                         'Materials__Equipment__PO_Costs']
+        variables_cat = ['Is_Lead', 'Opportunity', 'Warranty', 'Recall', 'Converted', 'Estimates']
+        variables = variables_num + variables_cat
+        train_set = pd.read_csv(f'data/jobprofit/fold{str(args.fold)}/100/train.csv')
+        val_set = pd.read_csv(f'data/jobprofit/fold{str(args.fold)}/100/val.csv')
+        test_set = pd.read_csv(f'data/jobprofit/fold{str(args.fold)}/100/test.csv')
+    else:
+        raise Exception('Dataset not implemented')
+
     X_train = train_set[variables].values
     y_train = train_set["Class"].values
     X_val = val_set[variables].values
@@ -66,7 +82,7 @@ def train_and_test_outlier(model):
     test_set['fst_step_scores'] = model.decision_function(X_test)
     test_set['fst_step_pred'] = model.predict(X_test)
 
-    model_path = os.path.join('storage', '{}_benchmark_fold{}'.format(args.model, str(args.fold)))
+    model_path = os.path.join('storage', dataset, '{}_benchmark_fold{}'.format(args.model, str(args.fold)))
     if not os.path.exists(model_path):
         os.makedirs(model_path)
     train_set.to_csv(os.path.join(model_path, 'train.csv'), index=False)
@@ -81,7 +97,8 @@ def train_and_test_outlier(model):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--model', type=str, default='rosas')
+    parser.add_argument('--dataset', type=str, required=True)
     parser.add_argument('--fold', type=int, default=1)
     args = parser.parse_args()
     print("===== Running {} benchmark =====".format(args.model))
-    train_and_test_outlier(args.model)
+    train_and_test_outlier(args.model, args.dataset)
