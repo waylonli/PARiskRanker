@@ -3,6 +3,7 @@ from datetime import datetime
 
 import numpy as np
 
+import util
 from preprocess.ltr_dataset import EmbedDataset
 from preprocess.ft_dataset import FTDataset
 from ranking_model.pariskranker import PARiskRanker
@@ -22,14 +23,25 @@ def train_pa_riskranker(args):
     args.batch_size = batch_size_map[args.group_size]
 
     # Load data to data loader
-    # get the absolute path of the current file
     train_df = pd.read_csv(os.path.join('data', args.dataset, f'fold{str(args.fold)}', str(args.group_size), 'train.csv'))
     val_df = pd.read_csv(os.path.join('data', args.dataset, f'fold{str(args.fold)}', str(args.group_size), 'val.csv'))
     test_df = pd.read_csv(os.path.join('data', args.dataset, f'fold{str(args.fold)}', str(args.group_size), 'test.csv'))
 
-    categ_variables = []
+
     # exclude ['Amount', 'Class', 'qid']
-    conti_variables = train_df.drop(columns=['Amount', 'Class', 'qid'], axis=1).columns.tolist()
+    if args.dataset == 'creditcard':
+        conti_variables = train_df.drop(columns=['Amount', 'Class', 'qid'], axis=1).columns.tolist()
+        categ_variables = []
+    elif args.dataset == "jobprofit":
+        conti_variables = ['Jobs_Gross_Margin_Percentage', 'Labor_Pay', 'Labor_Burden', 'Material_Costs', 'PO_Costs',
+                         'Equipment_Costs', 'Materials__Equip__POs_As_percent_of_Sales',
+                         'Labor_Burden_as_percent_of_Sales', 'Labor_Pay_as_percent_of_Sales', 'Sold_Hours',
+                         'Total_Hours_Worked', 'Total_Technician_Paid_Time', 'NonBillable_Hours', 'Jobs_Total_Costs',
+                         'Jobs_Estimate_Sales_Subtotal', 'Jobs_Estimate_Sales_Installed',
+                         'Materials__Equipment__PO_Costs']
+        categ_variables = ['Is_Lead', 'Opportunity', 'Warranty', 'Recall', 'Converted', 'Estimates']
+    else:
+        raise ValueError("Dataset not supported")
 
     label_col = 'Class'
 
@@ -37,15 +49,22 @@ def train_pa_riskranker(args):
     dev_loader, _, _ = load_data_ft(val_df, stage='dev', label_column=label_col, cat_variables=categ_variables, conti_variables=conti_variables, batch_size=args.batch_size, pnl_column='Amount')
 
     # save the config
-    store_path = "./storage/pariskranker_{}_{}_{}_fold{}".format(args.group_size, args.strategy, args.loss_fn, args.fold)
+    store_path = "./storage/{}/pariskranker_{}_{}_{}_fold{}".format(args.dataset, args.group_size, args.strategy, args.loss_fn, args.fold)
     if not os.path.exists(store_path):
         os.makedirs(store_path)
 
     if args.ft_embedding_checkpoint is None:
         ft_train_data = (FTDataset(train_df, label_column='Class', cat_variables=categ_variables, conti_variables=conti_variables,
                    device='cpu'),
-         FTDataset(val_df, label_column='Class', cat_variables=categ_variables, conti_variables=conti_variables,
+        FTDataset(val_df, label_column='Class', cat_variables=categ_variables, conti_variables=conti_variables,
                    device='cpu'))
+        ft_checkpoint = None
+    elif not os.path.exists(args.ft_embedding_checkpoint):
+        ft_train_data = (
+            FTDataset(train_df, label_column='Class', cat_variables=categ_variables, conti_variables=conti_variables,
+                      device='cpu'),
+            FTDataset(val_df, label_column='Class', cat_variables=categ_variables, conti_variables=conti_variables,
+                      device='cpu'))
         ft_checkpoint = None
     else:
         ft_train_data = None
@@ -62,7 +81,9 @@ def train_pa_riskranker(args):
         output_embedding_mode=False,
         loss_fn=args.loss_fn,
         ft_embedder_train_data=ft_train_data,
-        ft_embedder_checkpoint_path=ft_checkpoint
+        ft_embedder_checkpoint_path=ft_checkpoint,
+        freeze_ft_embedder=args.freeze_ft_embedder,
+        dataset_name=args.dataset,
     )
     
     # print trainable parameters sum in unit of million
@@ -119,7 +140,7 @@ def train_pa_riskranker(args):
 
         loop.set_description(f"Epoch {epoch} | Train Loss {round(log_loss / len(train_loader), 4)}")
         # evaluate on dev set every 5 epochs and save the best model
-        if epoch % 5 == 0:
+        if epoch % 1 == 0:
             pa_riskranker.eval()
             dev_loss = 0
             for batch in dev_loader:
@@ -151,7 +172,7 @@ def train_pa_riskranker(args):
 
 def test_pa_riskranker(args):
 
-    model_path = os.path.join('storage', 'pariskranker_{}_{}_{}_fold{}'.format(args.model_group_size, args.strategy, args.loss_fn, args.fold))
+    model_path = os.path.join('storage', args.dataset, 'pariskranker_{}_{}_{}_fold{}'.format(args.model_group_size, args.strategy, args.loss_fn, args.fold))
     output_path = os.path.join(model_path, args.test_group_size)
     is_binary = True if args.strategy == 'binary' else False
     # load the best model and config
@@ -170,10 +191,21 @@ def test_pa_riskranker(args):
     dev_set = pd.read_csv(os.path.join('data', args.dataset, f'fold{str(args.fold)}', str(args.test_group_size), 'val.csv')).sort_values(by=['qid', 'Class'])
     test_set = pd.read_csv(os.path.join('data', args.dataset, f'fold{str(args.fold)}', str(args.test_group_size), 'test.csv')).sort_values(
         by=['qid', 'Class'])
-    # combine categorical columns, turns one hot encoding to integer encoding
-    categ_variables = []
-    conti_variables = train_set.drop(columns=['Amount', 'Class', 'qid'], axis=1).columns.tolist()
 
+    # combine categorical columns, turns one hot encoding to integer encoding
+    if args.dataset == 'creditcard':
+        conti_variables = train_set.drop(columns=['Amount', 'Class', 'qid'], axis=1).columns.tolist()
+        categ_variables = []
+    elif args.dataset == "jobprofit":
+        conti_variables = ['Jobs_Gross_Margin_Percentage', 'Labor_Pay', 'Labor_Burden', 'Material_Costs', 'PO_Costs',
+                         'Equipment_Costs', 'Materials__Equip__POs_As_percent_of_Sales',
+                         'Labor_Burden_as_percent_of_Sales', 'Labor_Pay_as_percent_of_Sales', 'Sold_Hours',
+                         'Total_Hours_Worked', 'Total_Technician_Paid_Time', 'NonBillable_Hours', 'Jobs_Total_Costs',
+                         'Jobs_Estimate_Sales_Subtotal', 'Jobs_Estimate_Sales_Installed',
+                         'Materials__Equipment__PO_Costs']
+        categ_variables = ['Is_Lead', 'Opportunity', 'Warranty', 'Recall', 'Converted', 'Estimates']
+    else:
+        raise ValueError("Dataset not supported")
 
     label_col = 'Class'
 
@@ -193,7 +225,11 @@ def test_pa_riskranker(args):
         cat_feat, conti_feat, length, target = batch['cat_feat'].to(device), batch['conti_feat'].to(
             device), batch['length'].to(device), batch['target'].to(device)
         y_pred = pa_riskranker(cat_feat, conti_feat, length).squeeze()
-        train_ranking_score.extend(y_pred.detach().cpu().numpy())
+        try:
+            train_ranking_score.extend(y_pred.detach().cpu().numpy())
+        except:
+            train_ranking_score.append(y_pred.detach().cpu().numpy())
+
     train_set['fst_step_scores'] = train_ranking_score
 
     dev_ranking_score = []
@@ -203,7 +239,10 @@ def test_pa_riskranker(args):
         cat_feat, conti_feat, length, target = batch['cat_feat'].to(device), batch['conti_feat'].to(
             device), batch['length'].to(device), batch['target'].to(device)
         y_pred = pa_riskranker(cat_feat, conti_feat, length).squeeze()
-        dev_ranking_score.extend(y_pred.detach().cpu().numpy())
+        try:
+            dev_ranking_score.extend(y_pred.detach().cpu().numpy())
+        except:
+            dev_ranking_score.append(y_pred.detach().cpu().numpy())
     dev_set['fst_step_scores'] = dev_ranking_score
 
     test_ranking_score = []
@@ -213,7 +252,10 @@ def test_pa_riskranker(args):
         cat_feat, conti_feat, length, target = batch['cat_feat'].to(device), batch['conti_feat'].to(
             device), batch['length'].to(device), batch['target'].to(device)
         y_pred = pa_riskranker(cat_feat, conti_feat, length).squeeze()
-        test_ranking_score.extend(y_pred.detach().cpu().numpy())
+        try:
+            test_ranking_score.extend(y_pred.detach().cpu().numpy())
+        except:
+            test_ranking_score.append(y_pred.detach().cpu().numpy())
     test_set['fst_step_scores'] = test_ranking_score
 
     # generate ranking labels for train and test set according to the ranking score
@@ -240,50 +282,9 @@ def test_pa_riskranker(args):
     # use proper evaluation metric ndcg@k depending on the group size
     print("Computing NDCG score...")
 
-    train_ndcg_3 = 0
-    train_ndcg_5 = 0
-    train_ndcg_10 = 0
-    train_mrr = 0
-    validate_train_qids = 0
-    test_ndcg_3 = 0
-    test_ndcg_5 = 0
-    test_ndcg_10 = 0
-    test_mrr = 0
-    validate_test_qids = 0
+    train_ndcg_3, train_ndcg_5, train_ndcg_10, train_mrr = util.compute_ranking_metrics(train_set)
 
-    for qid in tqdm(train_set['qid'].unique(), bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}',
-                    desc="Computing NDCG score for training set"):
-        target_label = train_set[train_set['qid'] == qid]['Class'].values.astype(int)
-        if max(target_label) == 0:
-            continue
-        validate_train_qids += 1
-        rank_score = train_set[train_set['qid'] == qid]['fst_step_scores'].values
-        if max(rank_score) > 1 or min(rank_score) < 0:
-            rank_score = 1 / (1 + np.exp(-rank_score))
-        train_ndcg_3 += ndcg_score([target_label], [rank_score], k=3)
-        train_ndcg_5 += ndcg_score([target_label], [rank_score], k=5)
-        train_ndcg_10 += ndcg_score([target_label], [rank_score], k=10)
-        train_mrr += 1 / (np.where(rank_score == max(rank_score))[0][0] + 1)
-    train_ndcg_3 /= validate_train_qids
-    train_ndcg_5 /= validate_train_qids
-    train_ndcg_10 /= validate_train_qids
-    train_mrr /= validate_train_qids
-
-    for qid in tqdm(test_set['qid'].unique(), bar_format='{l_bar}{bar:10}{r_bar}{bar:-10b}',
-                    desc="Computing NDCG score for testing set"):
-        target_label = test_set[test_set['qid'] == qid]['Class'].values.astype(int)
-        if max(target_label) == 0:
-            continue
-        validate_test_qids += 1
-        rank_score = test_set[test_set['qid'] == qid]['fst_step_scores'].values
-        test_ndcg_3 += ndcg_score([target_label], [rank_score], k=3)
-        test_ndcg_5 += ndcg_score([target_label], [rank_score], k=5)
-        test_ndcg_10 += ndcg_score([target_label], [rank_score], k=10)
-        test_mrr += 1 / (np.where(rank_score == max(rank_score))[0][0] + 1)
-    test_ndcg_3 /= validate_test_qids
-    test_ndcg_5 /= validate_test_qids
-    test_ndcg_10 /= validate_test_qids
-    test_mrr /= validate_test_qids
+    test_ndcg_3, test_ndcg_5, test_ndcg_10, test_mrr = util.compute_ranking_metrics(test_set)
 
     print("Train NDCG@3: {:.4f}".format(train_ndcg_3))
     print("Train NDCG@5: {:.4f}".format(train_ndcg_5))
@@ -306,17 +307,19 @@ if __name__ == '__main__':
     train_parser.add_argument("--weight_decay", type=float, default=1e-5)
     train_parser.add_argument("--optimizer", type=str, default="adam")
     train_parser.add_argument("--group_size", type=int, choices=[10, 20, 30, 50, 100, 200, 500, 1000], default=100)
-    train_parser.add_argument("--dataset", type=str, default="creditcard")
+    train_parser.add_argument("--dataset", type=str, required=True)
     train_parser.add_argument("--tf_dim_feedforward", type=int, default=128)
     train_parser.add_argument("--tf_nhead", type=int, default=4)
     train_parser.add_argument("--tf_num_layers", type=int, default=4)
     train_parser.add_argument("--dropout", type=float, default=0.25)
     train_parser.add_argument("--over_sample", type=bool, default=False)
-    train_parser.add_argument("--strategy", type=str, choices=['ordinal', 'binary'], default='ordinal')
-    train_parser.add_argument("--pnl", type=bool, default=False)
-    train_parser.add_argument("--loss_fn", type=str, default="softmax")
+    train_parser.add_argument("--strategy", type=str, choices=['ordinal', 'binary'], default='binary')
+    train_parser.add_argument("--pnl", action="store_true")
+    train_parser.add_argument("--loss_fn", type=str, default="graph")
     train_parser.add_argument("--fold", type=int, default=1)
     train_parser.add_argument("--ft_embedding_checkpoint", type=str, default=None)
+    train_parser.add_argument("--freeze_ft_embedder", action="store_true", default=False,
+                             help="Whether to freeze the ft embedder during training")
 
     train_parser.set_defaults(func=train_pa_riskranker)
 
@@ -325,10 +328,10 @@ if __name__ == '__main__':
                              required=True, default=None)
     test_parser.add_argument('--test_group_size', type=str, choices=["20", "30", "50", "100", "200", "500", "1000"],
                              required=True, default=None)
-    test_parser.add_argument("--dataset", type=str, default="creditcard")
+    test_parser.add_argument("--dataset", type=str, required=True)
     test_parser.add_argument("--fold", type=int, default=1)
     test_parser.add_argument('--strategy', type=str, choices=['ordinal', 'binary'], required=True, default=None)
-    test_parser.add_argument("--loss_fn", type=str, default="softmax")
+    test_parser.add_argument("--loss_fn", type=str, default="graph")
     test_parser.set_defaults(func=test_pa_riskranker)
     args = parser.parse_args()
     args.func(args)
