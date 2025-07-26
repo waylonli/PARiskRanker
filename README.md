@@ -20,7 +20,7 @@ pip install -r requirements.txt
 
 ## 2. Data Preparation
 
-Download the preprocessed data from this [link](TODO).
+Download the preprocessed data from this [link](https://drive.google.com/file/d/11jE6cCo9bdXE6pl-BkrLkHfzM1Bt1PLL/view?usp=sharing).
 Unzip the downloaded data folder and place it at the project root directory. The folder structure should look like this:
 ```
 ├── data
@@ -28,7 +28,12 @@ Unzip the downloaded data folder and place it at the project root directory. The
 │   │   ├── fold1
 │   │   ├── fold2
 │   │   └── fold3
-│   └── creditcard.csv
+│   │   └── creditcard.csv
+│   ├── jobprofit (3folds)
+│   │   ├── fold1
+│   │   ├── fold2
+│   │   └── fold3
+│   │   └── job_profitability.csv
 ├── evaluation
 │   └── metrics.py
 ├── ...
