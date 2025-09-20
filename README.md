@@ -1,4 +1,4 @@
-# 🚀 PARiskRanker: Learn to Rank Risky Investors  
+# PARiskRanker: Learn to Rank Risky Investors  
 
 [![ACM](https://img.shields.io/static/v1?label=ACM%20TOIS&message=10.1145/3768623&color=blue&logo=acm)](https://dl.acm.org/doi/10.1145/3768623) [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Stars](https://img.shields.io/github/stars/waylonli/PARiskRanker?style=social)]()
 
