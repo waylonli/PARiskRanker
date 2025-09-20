@@ -4,7 +4,7 @@
 
 🔥 Official implementation of our ACM TOIS 2025 paper:  
 **“Learn to Rank Risky Investors: A Case Study of Predicting Retail Traders’ Behaviour and Profitability”**  
-by [Weixian Waylon Li](https://orcid.org/0000-0002-4196-9462) and [Tiejun Ma](https://orcid.org/0000-0001-5545-6978).  
+by [Waylon Li](https://waylonli.com) and [Tiejun Ma](https://orcid.org/0000-0001-5545-6978).  
 
 📄 Paper DOI: [10.1145/3768623](https://dl.acm.org/doi/10.1145/3768623)
 
