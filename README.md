@@ -2,9 +2,7 @@
 
 [![ACM](https://img.shields.io/static/v1?label=ACM%20TOIS&message=10.1145/3768623&color=blue&logo=acm)](https://dl.acm.org/doi/10.1145/3768623) [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/) [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE) [![Stars](https://img.shields.io/github/stars/waylonli/PARiskRanker?style=social)]()
 
-🔥 Official implementation of our ACM TOIS 2025 paper:  
-**“Learn to Rank Risky Investors: A Case Study of Predicting Retail Traders’ Behaviour and Profitability”**  
-by [Waylon Li](https://waylonli.com) and [Tiejun Ma](https://orcid.org/0000-0001-5545-6978).  
+🔥 Official implementation of our ACM TOIS 2025 paper: **“Learn to Rank Risky Investors: A Case Study of Predicting Retail Traders’ Behaviour and Profitability”** by [Waylon Li](https://waylonli.com) and [Tiejun Ma](https://orcid.org/0000-0001-5545-6978).  
 
 📄 Paper DOI: [10.1145/3768623](https://dl.acm.org/doi/10.1145/3768623)
 
