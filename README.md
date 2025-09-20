@@ -1,4 +1,6 @@
-# PARiskRanker
+# [ACM TOIS] PARiskRanker
+
+[![ACM](https://img.shields.io/static/v1?label=ACM&message=10.1145/3768623&color=blue&logo=acm)](https://dl.acm.org/doi/10.1145/3768623)
  
 Support codes and data for our paper "Learn to Rank Risky Investors: A Case Study of Predicting
 Retail Traders’ Behaviour and Profitability".
