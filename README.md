@@ -85,17 +85,22 @@ If you use this code, please cite:
 
 ```bibtex
 @article{10.1145/3768623,
-author = {Li, Weixian Waylon and Ma, Tiejun},
-title = {Learn to Rank Risky Investors: A Case Study of Predicting Retail Traders’ Behaviour and Profitability},
-year = {2025},
-publisher = {Association for Computing Machinery},
-address = {New York, NY, USA},
-issn = {1046-8188},
-url = {https://doi.org/10.1145/3768623},
-doi = {10.1145/3768623},
-journal = {ACM Trans. Inf. Syst.},
-month = sep,
-keywords = {learning to rank, domain-specific application, individual behaviour modelling, risk assessment}
+  author = {Li, Weixian Waylon and Ma, Tiejun},
+  title = {Learn to Rank Risky Investors: A Case Study of Predicting Retail Traders’ Behaviour and Profitability},
+  year = {2025},
+  issue_date = {January 2026},
+  publisher = {Association for Computing Machinery},
+  address = {New York, NY, USA},
+  volume = {44},
+  number = {1},
+  issn = {1046-8188},
+  url = {https://doi.org/10.1145/3768623},
+  doi = {10.1145/3768623},
+  journal = {ACM Trans. Inf. Syst.},
+  month = nov,
+  articleno = {15},
+  numpages = {33},
+  keywords = {learning to rank, domain-specific application, individual behaviour modelling, risk assessment}
 }
 ```
 
